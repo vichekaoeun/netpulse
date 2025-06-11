@@ -101,4 +101,9 @@ int send_ping(const char *target_ip, int sequence)
 
 int receive_ping_reply(int sockfd, double *rtt_ms)
 {
+    char buffer[1024];
+    struct sockaddr_in sender;
+    socklen_t sender_len = sizeof(sender);
+    struct timeval recv_time, send_time;
+    ssize_t bytes_received;
 }
