@@ -106,4 +106,23 @@ int receive_ping_reply(int sockfd, double *rtt_ms)
     socklen_t sender_len = sizeof(sender);
     struct timeval recv_time, send_time;
     ssize_t bytes_received;
+
+    struct timeval timeout;
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    bytes_received = recvfrom(sockfd, buffer, sizeof(buffer), 0,
+                            (struct sockaddr*)&sender, &sender_len);
+
+    if (bytes_received < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            printf("Ping timeout\n");
+            return -1;
+        }
+        perror("Failed to receive ping reply");
+        return -1;
+    }
+
+    gettimeofday(&recv_time, NULL);
 }
