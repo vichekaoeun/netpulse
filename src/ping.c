@@ -1,0 +1,104 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <arpa/inet.h>
+#include <sys/time.h>
+#include <errno.h>
+#include "ping.h"
+
+static int ping_sockfd = -1;
+
+uint16_t calculate_checksum(void *data, int len)
+{
+    uint16_t *ptr = (uint16_t *)data;
+    uint32_t sum = 0;
+
+    while (len > 1)
+    {
+        sum += *ptr++;
+        len -= 2;
+    }
+
+    if (len == 1)
+    {
+        sum += *(uint8_t *)ptr;
+    }
+
+    while (sum >> 16)
+    {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+
+    return ~sum; // return the complement
+}
+
+int init_ping_socket()
+{
+    if (ping_sockfd != -1)
+    {
+        return ping_sockfd;
+    }
+
+    ping_sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); // IPROTO_ICMP tells endpoint to send ICMP packets
+    if (ping_sockfd == -1)
+    {
+        perror("Socket creation failed");
+        return -1;
+    }
+
+    printf("ICMP socket created successfully.\n");
+    return ping_sockfd;
+}
+
+int send_ping(const char *target_ip, int sequence)
+{
+    if (ping_sockfd == -1)
+    {
+        printf("Socket not initialized.\n");
+        return -1;
+    }
+
+    struct sockaddr_in target;
+    struct icmp_packet packet;
+    struct timeval tv;
+
+    memset(&target, 0, sizeof(target)); // clear
+    target.sin_family = AF_INET;
+
+    if (inet_pton(AF_INET, target_ip, &target.sin_addr) <= 0) // check if target IP is valid
+    {
+        printf("Invalid IP address: %s\n", target_ip);
+        return -1;
+    }
+
+    memset(&packet, 0, sizeof(packet));
+
+    packet.type = ICMP_ECHO; // echo request
+    packet.code = 0;
+    packet.id = getpid();
+    packet.sequence = sequence;
+    packet.checksum = 0;
+
+    gettimeofday(&tv, NULL);
+    memcpy(packet.code, &tv, sizeof(tv)); // copy current time to packet data
+
+    packet.checksum = calculate_checksum(&packet, sizeof(packet));
+
+    if (sendto(ping_sockfd, &packet, sizeof(packet), 0,
+               (struct sockaddr *)&target, sizeof(target)) < 0)
+    {
+        perror("Failed to send ping");
+        return -1;
+    }
+
+    printf("Ping sent to %s (seq=%d)\n", target_ip, sequence);
+    return 0;
+}
+
+int receive_ping_reply(int sockfd, double *rtt_ms)
+{
+}
