@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -125,4 +126,44 @@ int receive_ping_reply(int sockfd, double *rtt_ms)
     }
 
     gettimeofday(&recv_time, NULL);
+
+    //Skip IP header to get to ICMP
+
+    struct ip* ip_header = (struct ip*)buffer;
+    int ip_header_len = ip_header->ip_hl * 4;
+
+    if (bytes_received < ip_header_len + 8) { //packet might not be big enough
+        printf("Received packet too short\n");
+        return -1;
+    }
+
+    struct icmp* icmp_header = (struct icmp*)(buffer + ip_header_len); //grab ICMP header
+
+    if (icmp_header->icmp_type == ICMP_ECHOREPLY && //check if packet is REPLY
+        icmp_header->icmp_id == getpid()) {
+        
+        //get send time
+        memcpy(&send_time, icmp_header->icmp_data, sizeof(send_time));
+        
+        // calculate RTT in milliseconds
+        *rtt_ms = (recv_time.tv_sec - send_time.tv_sec) * 1000.0;
+        *rtt_ms += (recv_time.tv_usec - send_time.tv_usec) / 1000.0;
+        
+        char sender_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &sender.sin_addr, sender_ip, INET_ADDRSTRLEN);
+        
+        printf("Reply from %s: seq=%d time=%.2f ms\n", 
+               sender_ip, icmp_header->icmp_seq, *rtt_ms);
+        
+        return 0;
+    }
+    
+    return -1; // Not our packet
+}
+
+void cleanup_ping_socket() { //clean
+    if (ping_sockfd != -1) {
+        close(ping_sockfd);
+        ping_sockfd = -1;
+    }
 }
