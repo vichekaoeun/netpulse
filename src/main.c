@@ -1,68 +1,47 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <unistd.h>
-#include <sys/time.h>
-#include <errno.h>
-
-int test_tcp_connection(const char *ip, int port)
-{
-    int sock;
-    struct sockaddr_in server;
-    struct timeval start, end;
-    double connect_time;
-
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1)
-    {
-        perror("Socket creation failed");
-        return -1;
-    }
-
-    server.sin_family = AF_INET;
-    server.sin_port = htons(port);
-
-    if (inet_pton(AF_INET, ip, &server.sin_addr) <= 0)
-    { // if conversion from text to binary form fails because of an invalid address
-        perror("Invalid address");
-        close(sock);
-        return -1;
-    }
-
-    gettimeofday(&start, NULL); // get the current time before connecting
-
-    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
-    { // if connection fails
-        printf("Connection failed to: %s:%d %s\n", ip, port, strerror(errno));
-        close(sock);
-        return -1;
-    }
-
-    gettimeofday(&end, NULL); // get the current time after connection ends
-
-    connect_time = (end.tv_sec - start.tv_sec) * 1000.0;
-    connect_time += (end.tv_usec - start.tv_usec) / 1000.0;
-
-    printf("Connected to %s:%d in %.2f ms\n", ip, port, connect_time);
-
-    close(sock);
-    return 0;
-}
+#include "ping.h"
 
 int main()
 {
-    printf("Basic TCP Connection Test\n");
+    printf("Netpulse -Network Monitoring Tool\n");
     printf("=========================\n");
 
-    // Test various servers
-    test_tcp_connection("8.8.8.8", 53);     // Google DNS
-    test_tcp_connection("1.1.1.1", 53);     // Cloudflare DNS
-    test_tcp_connection("8.8.8.8", 443);    // Google HTTPS (might work)
-    test_tcp_connection("1.1.1.1", 443);    // Cloudflare HTTPS (should work)
-    test_tcp_connection("192.168.1.1", 22); // Local router SSH (likely fails)
+    if (init_ping_socket() < 0) {
+        printf("Failed to initialize ping socket. Exiting.\n");
+        return 1;
+    }
 
+    const char* targets[] = {
+        "8.8.8.8",      // Google DNS
+        "1.1.1.1",      // Cloudflare DNS
+    };
+
+    int num_targets = sizeof(targets) / sizeof(targets[0]);
+
+    printf("\nTesting ICMP ping to multiple targets:\n");
+    printf("--------------------------------------\n");
+
+    for (int i = 0; i < num_targets; i++) {
+        printf("\nPinging %s:\n", targets[i]);
+        
+        for (int seq = 1; seq <= 3; seq++) {
+            double rtt_ms;
+            
+            //send ping
+            if (send_ping(targets[i], seq) == 0) {
+                if (receive_ping_reply(init_ping_socket(), &rtt_ms) == 0) {
+                } else {
+                    printf("No reply for seq=%d\n", seq);
+                }
+            }
+            
+            sleep(1); //wait 1 sec between pings
+        }
+    }
+    
+    cleanup_ping_socket();
+    printf("\nPing test complete.\n");
     return 0;
 }
