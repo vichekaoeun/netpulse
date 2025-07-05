@@ -17,6 +17,8 @@ int main()
     const char* targets[] = {
         "8.8.8.8",      // Google DNS
         "1.1.1.1",      // Cloudflare DNS
+        "208.67.222.222",
+        "192.0.2.1",
     };
 
     int num_targets = sizeof(targets) / sizeof(targets[0]);
@@ -59,7 +61,10 @@ int main()
 
     printf("\n=== OVERALL SUMMARY ===\n");
     for (int i = 0; i < num_targets; i++) {
-        printf("%s: %.1f%% packet loss\n", targets[i], calculate_packet_loss(&stats[i]));
+        printf("%s: %.1fms packet loss\n", targets[i], calculate_packet_loss(&stats[i]));
+    }
+    for (int i = 0; i < num_targets; i++){
+        printf("%s: %.1fms jitter \n", targets[i], calculate_jitter(&stats[i]));
     }
 
     return 0;
