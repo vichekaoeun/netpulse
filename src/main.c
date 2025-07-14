@@ -33,11 +33,10 @@ void daemonize() {
     open("/dev/null", O_WRONLY);
     open("/dev/null", O_RDWR);
 
-    int fd = open("/tmp/netpulse.log", O_RDWR | O_CREAT | O_APPEND, 0600);
-    if (fd != -1) {
-        dup2(fd, STDOUT_FILENO);
-        dup2(fd, STDERR_FILENO);
-        close(fd);
+    FILE* pid_file = fopen("/tmp/netpulse.pid", "w");
+    if (pid_file) {
+        fprintf(pid_file, "%d\n", getpid());
+        fclose(pid_file);
     }
 }
 
