@@ -2,7 +2,7 @@ SRCDIR = src
 SOURCES = $(wildcard $(SRCDIR)/*.c)
 OBJECTS = $(SOURCES:.c=.o)
 CFLAGS = -Wall -Wextra -std=c99 -g
-LDFLAGS = -lpthread
+LDFLAGS = -lpthread -lncurses
 
 netpulse: $(OBJECTS)
 	gcc $(OBJECTS) -o netpulse $(LDFLAGS)

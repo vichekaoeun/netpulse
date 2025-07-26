@@ -24,6 +24,7 @@ struct ping_stats {
     double previous_rtt;
     double total_jitter;
     int jitter_count;
+    int packet_activity;
 };
 
 int init_ping_socket();
@@ -37,7 +38,6 @@ double calculate_packet_loss(struct ping_stats *stats);
 double calculate_average_rtt(struct ping_stats *stats);
 void print_stats_summary(struct ping_stats *stats);
 void print_live_status(struct ping_stats *stats);
-double calculate_jitter(struct ping_stats *stats);
 double calculate_jitter(struct ping_stats *stats);
 const char* assess_network_quality(struct ping_stats *stats);
 

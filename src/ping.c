@@ -12,8 +12,9 @@
 #include "ping.h"
 
 static int ping_sockfd = -1;
+int log_to_tui = 1;
 
-uint16_t calculate_checksum(void* data, int len) {
+uint16_t calculate_checksum(void *data, int len) {
     uint16_t* ptr = (uint16_t*)data;
     uint32_t sum = 0;
     
@@ -40,18 +41,24 @@ int init_ping_socket() {
     
     ping_sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (ping_sockfd == -1) {
-        perror("Failed to create raw socket");
-        printf("Note: Raw sockets require root privileges. Try: sudo ./netpulse\n");
+        if (!log_to_tui) {
+            perror("Failed to create raw socket");
+            printf("Note: Raw sockets require root privileges. Try: sudo ./netpulse\n");
+        }
         return -1;
     }
     
-    printf("ICMP socket created successfully\n");
+    if (!log_to_tui) {
+        printf("ICMP socket created successfully\n");
+    }
     return ping_sockfd;
 }
 
 int send_ping(const char* target_ip, int sequence) {
     if (ping_sockfd == -1) {
-        printf("Socket not initialized. Call init_ping_socket() first.\n");
+        if (!log_to_tui) {
+            printf("Socket not initialized. Call init_ping_socket() first.\n");
+        }
         return -1;
     }
     
@@ -63,7 +70,9 @@ int send_ping(const char* target_ip, int sequence) {
     target.sin_family = AF_INET;
     
     if (inet_pton(AF_INET, target_ip, &target.sin_addr) <= 0) {
-        printf("Invalid IP address: %s\n", target_ip);
+        if (!log_to_tui) {
+            printf("Invalid IP address: %s\n", target_ip);
+        }
         return -1;
     }
     
@@ -73,7 +82,6 @@ int send_ping(const char* target_ip, int sequence) {
     packet.id = getpid();        
     packet.sequence = sequence;   
     packet.checksum = 0;         
-    
     gettimeofday(&tv, NULL);
     packet.timestamp = tv.tv_sec + tv.tv_usec / 1000000.0;
     
@@ -81,11 +89,12 @@ int send_ping(const char* target_ip, int sequence) {
     
     if (sendto(ping_sockfd, &packet, sizeof(packet), 0,
                (struct sockaddr*)&target, sizeof(target)) < 0) {
-        perror("Failed to send ping");
+        if (!log_to_tui) {
+            perror("Failed to send ping");
+        }
         return -1;
     }
     
-    printf("Ping sent to %s (seq=%d)\n", target_ip, sequence);
     return 0;
 }
 
@@ -106,10 +115,14 @@ int receive_ping_reply(int sockfd, double* rtt_ms) {
     
     if (bytes_received < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            printf("Ping timeout\n");
+            if (!log_to_tui) {
+                printf("Ping timeout\n");
+            }
             return -1;
         }
-        perror("Failed to receive ping reply");
+        if (!log_to_tui) {
+            perror("Failed to receive ping reply");
+        }
         return -1;
     }
     
@@ -119,7 +132,9 @@ int receive_ping_reply(int sockfd, double* rtt_ms) {
     int ip_header_len = ip_header->ip_hl * 4;
     
     if (bytes_received < ip_header_len + 8) {
-        printf("Received packet too short\n");
+        if (!log_to_tui) {
+            printf("Received packet too short\n");
+        }
         return -1;
     }
     
@@ -132,14 +147,7 @@ int receive_ping_reply(int sockfd, double* rtt_ms) {
         memcpy(&send_timestamp, icmp_header->icmp_data, sizeof(send_timestamp));
         
         double recv_timestamp = recv_time.tv_sec + recv_time.tv_usec / 1000000.0;
-        
         *rtt_ms = (recv_timestamp - send_timestamp) * 1000.0;
-        
-        char sender_ip[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &sender.sin_addr, sender_ip, INET_ADDRSTRLEN);
-        
-        printf("Reply from %s: seq=%d time=%.2f ms\n", 
-               sender_ip, icmp_header->icmp_seq, *rtt_ms);
         
         return 0;
     }
